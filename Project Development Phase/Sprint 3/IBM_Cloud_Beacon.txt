@@ -1,0 +1,149 @@
+﻿#include
+&lt;WiFi.h&gt;
+
+
+#include &lt;PubSubClient.h&gt;
+#include &lt;DHT.h&gt;
+WiFiClient wifiClient;
+String data3;
+#define DHTTYPE DHT11
+#define DHTPIN 9
+DHT dht(DHTPIN, DHTTYPE);
+
+
+#define ORG &quot;v6wg8x&quot;
+#define DEVICE_TYPE &quot;nodeMcu&quot;
+#define DEVICE_ID &quot;NodeMCU&quot;
+#define TOKEN &quot;123456789&quot;
+#define speed 0.034
+
+
+void callback(char* topic, byte* playload, unsigned int
+payloadLength);
+
+
+char server[] = ORG
+&quot;.messaging.internetofthings.ibmcloud.com&quot;;
+char publishTopic[] = &quot;iot-2/evt/Data/fmt/json&quot;;
+char topic[] = &quot;iot-2/cmd/test/fmt/String&quot;;
+char authMethod[] = &quot;use-token-auth&quot;;
+char token[] = TOKEN;
+
+
+char clientId[] = &quot;d:&quot; ORG &quot;:&quot; DEVICE_TYPE &quot;:&quot;
+DEVICE_ID;
+PubSubClient client(server, 1883, callback ,
+wifiClient);
+void publishData();
+
+
+String command;
+String data = &quot;&quot;;
+
+
+long duration;
+float dist;
+
+
+void setup()
+{
+Serial.begin(115200);
+dht.begin();
+wifiConnect();
+mqttConnect();
+}
+
+
+void loop() {
+publishData();
+
+
+delay(500);
+
+
+if (!client.loop()) {
+mqttConnect();
+}
+}
+
+
+void wifiConnect() {
+Serial.print(&quot;Connecting to &quot;); Serial.print(&quot;Wifi&quot;);
+WiFi.begin(&quot;SSID&quot;,&quot;Passord&quot;);
+while (WiFi.status() != WL_CONNECTED) {
+delay(500);
+Serial.print(&quot;.&quot;);
+}
+Serial.print(&quot;WiFi connected, IP address: &quot;);
+Serial.println(WiFi.localIP());
+}
+
+
+void mqttConnect() {
+if (!client.connected()) {
+Serial.print(&quot;Reconnecting MQTT client to &quot;);
+Serial.println(server);
+while (!client.connect(clientId, authMethod,
+token)) {
+Serial.print(&quot;.&quot;);
+
+
+delay(500);
+}
+initManagedDevice();
+Serial.println();
+}
+}
+
+
+void initManagedDevice() {
+if (client.subscribe(topic)) {
+Serial.println(&quot;IBM subscribe to cmd OK&quot;);
+} else {
+Serial.println(&quot;subscribe to cmd FAILED&quot;);
+}
+}
+
+
+void publishData()
+{
+int sensorValue = analogRead(34); //MQT 135 connected
+to GPIO 34 (Analog ADC1_CH6)
+Serial.print(&quot;AirQua=&quot;);
+Serial.print(sensorValue, DEC);
+Serial.println(&quot; PPM&quot;);
+float humid = dht.readHumidity();
+float temp = dht.readTemperature(true);
+
+
+float airQty = sensorValue/4095;
+String payload = &quot;{\&quot;Temperature\&quot;:&quot;;
+payload += temp;
+payload += &quot;}&quot;;
+if (client.publish(publishTopic, (char*)
+payload.c_str())) {
+Serial.println(&quot;Publish OK&quot;);
+}
+payload = &quot;{\&quot;Air Quality\&quot;:&quot;;
+payload += airQty;
+payload += &quot;%}&quot;;
+if (client.publish(publishTopic, (char*)
+payload.c_str())) {
+Serial.println(&quot;Publish OK&quot;);
+}
+}
+void callback(char* subscribeTopic, byte* payload,
+unsigned int payloadLength) {
+Serial.print(&quot;callback invoked for topic:&quot;);
+Serial.println(subscribeTopic);
+for (int i = 0; i &lt; payloadLength; i++) {
+dist += (char)payload[i];
+}
+Serial.println(&quot;data:&quot; + data3);
+
+
+if (data3 == &quot;lighton&quot;) {
+Serial.println(data3);
+}
+data3 = &quot;&quot;;
+}
